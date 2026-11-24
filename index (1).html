@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Women Shield</title>
+<style>
+:root{--bg:#fff7fa;--card:#fff;--tx:#2b1b24;--mut:#7a6570;--pri:#c2185b;--ok:#2e7d32;--bad:#c62828;--bd:#f0d6e0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1117;--card:#26191f;--tx:#f6e9ef;--mut:#b49aa6;--pri:#f06292;--ok:#66bb6a;--bad:#ef5350;--bd:#3d2a33}}
+:root[data-theme="dark"]{--bg:#1a1117;--card:#26191f;--tx:#f6e9ef;--mut:#b49aa6;--pri:#f06292;--ok:#66bb6a;--bad:#ef5350;--bd:#3d2a33}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.45}
+main{max-width:480px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:0 0 2px;color:var(--pri)}p.s{margin:0 0 14px;color:var(--mut);font-size:.9rem}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:.8rem;color:var(--mut);margin:8px 0 3px}
+input{width:100%;padding:10px;border-radius:9px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font-size:1rem}
+button{width:100%;padding:13px;border:0;border-radius:11px;font-size:1rem;font-weight:600;cursor:pointer;margin-top:8px;color:#fff;background:var(--pri)}
+button.g{background:var(--ok)}button.r{background:var(--bad)}button.o{background:transparent;color:var(--pri);border:1px solid var(--pri)}
+.st{display:flex;align-items:center;gap:8px;font-weight:600}.dot{width:12px;height:12px;border-radius:50%;background:var(--mut)}
+.on .dot{background:var(--ok)}.alert .dot{background:var(--bad);animation:b .6s infinite alternate}
+@keyframes b{to{opacity:.2}}
+#chk{display:none;border:2px solid var(--bad)}#chk.show{display:block}
+#t{font-size:3rem;font-weight:800;text-align:center;color:var(--bad);margin:4px 0}
+#msg{text-align:center;font-weight:600}
+.log{font-size:.8rem;color:var(--mut);max-height:120px;overflow:auto;margin:0;padding-left:16px}
+.small{font-size:.75rem;color:var(--mut)}
+</style></head><body><main>
+<h1>🛡️ Women Shield</h1><p class="s">Tracks your movement, checks on you by voice, and escalates if you can’t answer.</p>
+
+<div class="card"><div class="st" id="stat"><span class="dot"></span><span id="stx">Not monitoring</span></div>
+<div class="small" id="loc">Location: –</div>
+<button id="go" class="g">Start protection</button></div>
+
+<div class="card" id="chk"><div id="msg">Are you okay?</div><div id="t">20</div>
+<button class="g" id="ok">✅ I’m okay</button><button class="r" id="help">🆘 I need help</button>
+<div class="small" style="text-align:center;margin-top:8px">You can also say “yes” or “help”.</div></div>
+
+<div class="card"><b>Setup</b>
+<label>Emergency contact name</label><input id="cn" placeholder="Mother">
+<label>Emergency contact number</label><input id="cp" type="tel" placeholder="+919876543210 (with country code)">
+<label>Helpline number (India: 112 or 1091)</label><input id="hp" value="112">
+<label>Alert if no movement for (seconds)</label><input id="idle" type="number" value="120" min="10">
+<label>Response time (seconds)</label><input id="rt" type="number" value="20" min="5">
+<button class="o" id="sv">Save settings</button>
+<button class="o" id="sim">Simulate anomaly (test)</button></div>
+
+<div class="card"><b>Activity log</b><ul class="log" id="log"></ul>
+<div class="small" style="margin-top:8px">Browsers can’t send SMS or place calls silently: the app opens your messaging and dialer with everything filled in. Fully automatic sending needs a backend (e.g. an SMS API).</div></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let mode='off',wid=null,last=null,lastMove=Date.now(),lastSpeed=0,pos=null,tick=null,voiceTimer=null,ac=null,beepT=null,rec=null,left=0,stage=0;
+function log(s){const l=document.createElement('li');l.textContent=new Date().toLocaleTimeString()+' – '+s;$('log').prepend(l)}
+function load(){try{const d=JSON.parse(localStorage.getItem('ws')||'{}');['cn','cp','hp','idle','rt'].forEach(k=>{if(d[k])$(k).value=d[k]})}catch(e){}}
+$('sv').onclick=()=>{try{const d={};['cn','cp','hp','idle','rt'].forEach(k=>d[k]=$(k).value);localStorage.setItem('ws',JSON.stringify(d))}catch(e){}log('Settings saved')};
+function setStat(c,t){$('stat').className='st '+c;$('stx').textContent=t}
+function speak(t){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.95;speechSynthesis.speak(u)}catch(e){}}
+function beep(on){clearInterval(beepT);if(!on)return;try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const f=()=>{const o=ac.createOscillator(),g=ac.createGain();o.type='square';o.frequency.value=880;g.gain.value=.25;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.25)};f();beepT=setInterval(f,600)}catch(e){}}
+function mapLink(){return pos?`https://maps.google.com/?q=${pos.latitude},${pos.longitude}`:'(location unavailable)'}
+function listen(){try{const R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R)return;rec=new R();rec.continuous=true;rec.interimResults=false;
+rec.onresult=e=>{const w=e.results[e.results.length-1][0].transcript.toLowerCase();log('Heard: '+w);if(/\b(help|no|not ok|danger)\b/.test(w))needHelp();else if(/\b(yes|okay|ok|fine|safe)\b/.test(w))safe()};
+rec.onend=()=>{if(mode==='check'||mode==='contact')try{rec.start()}catch(e){}};rec.start()}catch(e){}}
+function stopListen(){try{rec&&(rec.onend=null,rec.stop())}catch(e){}}
+function startCheck(why){if(mode==='check'||mode==='contact'||mode==='off')return;mode='check';stage=1;log('Anomaly: '+why);
+$('chk').classList.add('show');setStat('alert','Safety check in progress');
+$('msg').textContent='Are you okay?';left=+$('rt').value||20;$('t').textContent=left;
+beep(true);speak('Are you okay? Please respond.');voiceTimer=setInterval(()=>speak('Are you okay? Say yes or tap I am okay.'),8000);listen();
+tick=setInterval(()=>{left--;$('t').textContent=left;if(left<=0)escalate()},1000)}
+function clearAll(){clearInterval(tick);clearInterval(voiceTimer);beep(false);stopListen();try{speechSynthesis.cancel()}catch(e){}}
+function safe(){clearAll();$('chk').classList.remove('show');mode='on';stage=0;lastMove=Date.now();setStat('on','Protection active');log('User confirmed safe');speak('Glad you are safe.')}
+function needHelp(){log('User asked for help');escalate(true)}
+function escalate(){clearInterval(tick);clearInterval(voiceTimer);
+if(stage===1){stage=2;mode='contact';const n=$('cn').value||'your contact';log('No response – alerting '+n);
+$('msg').textContent='Alerting '+n+'. Are you okay now?';left=+$('rt').value||20;$('t').textContent=left;
+speak('No response. Alerting your emergency contact.');
+const p=($('cp').value||'').replace(/[^\d+]/g,'');
+fetch('/api/alert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:p,name:$('cn').value,lat:pos&&pos.latitude,lng:pos&&pos.longitude})})
+.then(r=>{if(!r.ok)throw 0;log('SMS + voice call sent to contact')})
+.catch(()=>{log('Server failed - opening SMS app instead');location.href='sms:'+p+'?body='+encodeURIComponent('🆘 Women Shield alert. My location: '+mapLink())});
+tick=setInterval(()=>{left--;$('t').textContent=left;if(left<=0)escalate()},1000);voiceTimer=setInterval(()=>speak('Are you okay? Respond now or the helpline will be called.'),8000)}
+else if(stage===2){stage=3;clearAll();mode='helpline';log('Still no safe response – calling helpline');
+$('msg').textContent='Calling helpline '+$('hp').value;$('t').textContent='📞';speak('Calling the helpline now.');
+location.href='tel:'+($('hp').value||'112')}}
+$('ok').onclick=safe;$('help').onclick=needHelp;
+$('sim').onclick=()=>{if(mode==='off'){log('Press Start protection first');return}startCheck('simulated test')};
+function onPos(p){const c=p.coords;pos=c;$('loc').textContent=`Location: ${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)} (±${Math.round(c.accuracy)}m)`;
+if(last){const d=dist(last,c);const dt=(p.timestamp-last.t)/1000||1;const sp=d/dt;
+if(d>15){lastMove=Date.now()}
+if(lastSpeed>4&&sp<.5&&mode==='on')startCheck('sudden stop after fast movement');
+lastSpeed=sp}
+last={latitude:c.latitude,longitude:c.longitude,t:p.timestamp}}
+function dist(a,b){const R=6371000,r=Math.PI/180,x=(b.latitude-a.latitude)*r,y=(b.longitude-a.longitude)*r;
+const h=Math.sin(x/2)**2+Math.cos(a.latitude*r)*Math.cos(b.latitude*r)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+$('go').onclick=()=>{
+if(mode!=='off'){clearAll();if(wid!==null)navigator.geolocation.clearWatch(wid);clearInterval(window.mon);mode='off';$('chk').classList.remove('show');setStat('','Not monitoring');$('go').textContent='Start protection';$('go').className='g';log('Protection stopped');return}
+try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();speechSynthesis.speak(new SpeechSynthesisUtterance(''))}catch(e){}
+if(!navigator.geolocation){log('Location not supported');return}
+wid=navigator.geolocation.watchPosition(onPos,e=>log('Location error: '+e.message),{enableHighAccuracy:true,maximumAge:5000});
+mode='on';lastMove=Date.now();setStat('on','Protection active');$('go').textContent='Stop protection';$('go').className='r';log('Protection started');
+window.mon=setInterval(()=>{if(mode==='on'&&(Date.now()-lastMove)/1000>(+$('idle').value||120))startCheck('no movement for '+$('idle').value+'s')},3000)};
+load();
+</script></body></html>
