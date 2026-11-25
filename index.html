@@ -23,7 +23,22 @@ button.g{background:var(--ok)}button.r{background:var(--bad)}button.o{background
 #msg{text-align:center;font-weight:600}
 .log{font-size:.8rem;color:var(--mut);max-height:120px;overflow:auto;margin:0;padding-left:16px}
 .small{font-size:.75rem;color:var(--mut)}
+#home{text-align:center;padding:26px 6px}#home h1{font-size:2rem}
+#home ol{text-align:left;color:var(--mut);padding-left:22px}#home li{margin:6px 0}
+#share{display:none;border:2px solid var(--pri)}
+a.back{color:var(--mut);font-size:.8rem;cursor:pointer;text-decoration:underline}
 </style></head><body><main>
+<section id="home" class="card">
+<div style="font-size:3rem">🛡️</div><h1>Women Shield</h1>
+<p class="s">A personal safety guardian that notices when something is wrong and reaches your people for you.</p>
+<ol><li>Tracks your location and movement while you travel</li>
+<li>Asks “Are you okay?” by voice with an alarm and a timer</li>
+<li>No response? Sends your live location to your emergency contact</li>
+<li>Still no answer? Calls the helpline</li></ol>
+<button id="start">Open Women Shield</button>
+<div class="small" style="margin-top:10px">Allow location and sound when asked.</div>
+</section>
+<div id="app" style="display:none">
 <h1>🛡️ Women Shield</h1><p class="s">Tracks your movement, checks on you by voice, and escalates if you can’t answer.</p>
 
 <div class="card"><div class="st" id="stat"><span class="dot"></span><span id="stx">Not monitoring</span></div>
@@ -34,6 +49,11 @@ button.g{background:var(--ok)}button.r{background:var(--bad)}button.o{background
 <button class="g" id="ok">✅ I’m okay</button><button class="r" id="help">🆘 I need help</button>
 <div class="small" style="text-align:center;margin-top:8px">You can also say “yes” or “help”.</div></div>
 
+<div class="card" id="share"><b>🚨 Alert your emergency contact</b>
+<div class="small" id="shm">Choose how to send your message and live location.</div>
+<button class="g" id="wa">Send on WhatsApp</button><button id="sm">Send by SMS</button>
+<button class="o" id="shr">Share / copy message</button><button class="o" id="relo">Send updated location</button></div>
+
 <div class="card"><b>Setup</b>
 <label>Emergency contact name</label><input id="cn" placeholder="Mother">
 <label>Emergency contact number</label><input id="cp" type="tel" placeholder="+919876543210 (with country code)">
@@ -43,9 +63,9 @@ button.g{background:var(--ok)}button.r{background:var(--bad)}button.o{background
 <button class="o" id="sv">Save settings</button>
 <button class="o" id="sim">Simulate anomaly (test)</button></div>
 
-<div class="card"><b>Activity log</b><ul class="log" id="log"></ul>
-<div class="small" style="margin-top:8px">Browsers can’t send SMS or place calls silently: the app opens your messaging and dialer with everything filled in. Fully automatic sending needs a backend (e.g. an SMS API).</div></div>
-</main>
+<div class="card"><a class="back" id="bk">← Home</a><br><b>Activity log</b><ul class="log" id="log"></ul>
+<div class="small" style="margin-top:8px">The app opens WhatsApp or SMS with your message and live location filled in. Browsers don’t allow silent sending, so the contact needs one tap on send.</div></div>
+</div></main>
 <script>
 const $=id=>document.getElementById(id);
 let mode='off',wid=null,last=null,lastMove=Date.now(),lastSpeed=0,pos=null,tick=null,voiceTimer=null,ac=null,beepT=null,rec=null,left=0,stage=0;
@@ -66,16 +86,25 @@ $('msg').textContent='Are you okay?';left=+$('rt').value||20;$('t').textContent=
 beep(true);speak('Are you okay? Please respond.');voiceTimer=setInterval(()=>speak('Are you okay? Say yes or tap I am okay.'),8000);listen();
 tick=setInterval(()=>{left--;$('t').textContent=left;if(left<=0)escalate()},1000)}
 function clearAll(){clearInterval(tick);clearInterval(voiceTimer);beep(false);stopListen();try{speechSynthesis.cancel()}catch(e){}}
-function safe(){clearAll();$('chk').classList.remove('show');mode='on';stage=0;lastMove=Date.now();setStat('on','Protection active');log('User confirmed safe');speak('Glad you are safe.')}
+function safe(){clearAll();$('share').style.display='none';$('chk').classList.remove('show');mode='on';stage=0;lastMove=Date.now();setStat('on','Protection active');log('User confirmed safe');speak('Glad you are safe.')}
 function needHelp(){log('User asked for help');escalate(true)}
+function num(){let d=($('cp').value||'').replace(/\D/g,'');if(d.length===10)d='91'+d;return d}
+function msg(){const n=$('cn').value;return '🆘 Women Shield alert: I may be in danger and did not respond to a safety check. My current location: '+mapLink()+' (sent '+new Date().toLocaleTimeString()+')'}
+function smsUrl(){return 'sms:+'+num()+'?&body='+encodeURIComponent(msg())}
+function sendAlert(){$('share').style.display='block';
+if(!num()){log('No contact number saved - use Share below');return}
+log('Alert prepared for contact with live location');location.href=smsUrl()}
+$('wa').onclick=()=>{if(!num())return log('Add contact number first');window.open('https://wa.me/'+num()+'?text='+encodeURIComponent(msg()),'_blank');log('Opened WhatsApp with location')};
+$('sm').onclick=()=>{if(!num())return log('Add contact number first');location.href=smsUrl()};
+$('relo').onclick=()=>{navigator.geolocation.getCurrentPosition(p=>{pos=p.coords;log('Location refreshed');location.href=smsUrl()},()=>{log('Could not refresh location');location.href=smsUrl()},{enableHighAccuracy:true,timeout:5000})};
+$('shr').onclick=()=>{if(navigator.share)navigator.share({title:'Women Shield alert',text:msg()}).catch(()=>{});else if(navigator.clipboard)navigator.clipboard.writeText(msg()).then(()=>log('Message copied'))};
+$('start').onclick=()=>{$('home').style.display='none';$('app').style.display='block';window.scrollTo(0,0)};
+$('bk').onclick=()=>{$('app').style.display='none';$('home').style.display='block'};
 function escalate(){clearInterval(tick);clearInterval(voiceTimer);
 if(stage===1){stage=2;mode='contact';const n=$('cn').value||'your contact';log('No response – alerting '+n);
 $('msg').textContent='Alerting '+n+'. Are you okay now?';left=+$('rt').value||20;$('t').textContent=left;
 speak('No response. Alerting your emergency contact.');
-const p=($('cp').value||'').replace(/[^\d+]/g,'');
-fetch('/api/alert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:p,name:$('cn').value,lat:pos&&pos.latitude,lng:pos&&pos.longitude})})
-.then(r=>{if(!r.ok)throw 0;log('SMS + voice call sent to contact')})
-.catch(()=>{log('Server failed - opening SMS app instead');location.href='sms:'+p+'?body='+encodeURIComponent('🆘 Women Shield alert. My location: '+mapLink())});
+sendAlert();
 tick=setInterval(()=>{left--;$('t').textContent=left;if(left<=0)escalate()},1000);voiceTimer=setInterval(()=>speak('Are you okay? Respond now or the helpline will be called.'),8000)}
 else if(stage===2){stage=3;clearAll();mode='helpline';log('Still no safe response – calling helpline');
 $('msg').textContent='Calling helpline '+$('hp').value;$('t').textContent='📞';speak('Calling the helpline now.');
@@ -91,7 +120,7 @@ last={latitude:c.latitude,longitude:c.longitude,t:p.timestamp}}
 function dist(a,b){const R=6371000,r=Math.PI/180,x=(b.latitude-a.latitude)*r,y=(b.longitude-a.longitude)*r;
 const h=Math.sin(x/2)**2+Math.cos(a.latitude*r)*Math.cos(b.latitude*r)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
 $('go').onclick=()=>{
-if(mode!=='off'){clearAll();if(wid!==null)navigator.geolocation.clearWatch(wid);clearInterval(window.mon);mode='off';$('chk').classList.remove('show');setStat('','Not monitoring');$('go').textContent='Start protection';$('go').className='g';log('Protection stopped');return}
+if(mode!=='off'){clearAll();if(wid!==null)navigator.geolocation.clearWatch(wid);clearInterval(window.mon);mode='off';$('share').style.display='none';$('chk').classList.remove('show');setStat('','Not monitoring');$('go').textContent='Start protection';$('go').className='g';log('Protection stopped');return}
 try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();speechSynthesis.speak(new SpeechSynthesisUtterance(''))}catch(e){}
 if(!navigator.geolocation){log('Location not supported');return}
 wid=navigator.geolocation.watchPosition(onPos,e=>log('Location error: '+e.message),{enableHighAccuracy:true,maximumAge:5000});
