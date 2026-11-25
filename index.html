@@ -92,12 +92,17 @@ function needHelp(){log('User asked for help');escalate(true)}
 function num(){let d=($('cp').value||'').replace(/\D/g,'');if(d.length===10)d='91'+d;return d}
 function msg(){const n=$('cn').value;return '🆘 Women Shield alert: '+(window.vsos?'I said "I need help" (voice SOS).':'I may be in danger and did not respond to a safety check.')+' My current location: '+mapLink()+' (sent '+new Date().toLocaleTimeString()+')'}
 function smsUrl(){return 'sms:+'+num()+'?&body='+encodeURIComponent(msg())}
+const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+function sendSms(auto){if(isMobile){location.href=smsUrl();return}
+try{navigator.clipboard.writeText(msg())}catch(e){}
+if(!auto)window.open('https://messages.google.com/web','_blank');
+log('Laptop: message copied - paste it in Google Messages, or use the WhatsApp button')}
 function sendAlert(){$('share').style.display='block';
 if(!num()){log('No contact number saved - use Share below');return}
-log('Alert prepared for contact with live location');location.href=smsUrl()}
+log('Alert prepared for contact with live location');sendSms(true)}
 $('wa').onclick=()=>{if(!num())return log('Add contact number first');window.open('https://wa.me/'+num()+'?text='+encodeURIComponent(msg()),'_blank');log('Opened WhatsApp with location')};
-$('sm').onclick=()=>{if(!num())return log('Add contact number first');location.href=smsUrl()};
-$('relo').onclick=()=>{navigator.geolocation.getCurrentPosition(p=>{pos=p.coords;log('Location refreshed');location.href=smsUrl()},()=>{log('Could not refresh location');location.href=smsUrl()},{enableHighAccuracy:true,timeout:5000})};
+$('sm').onclick=()=>{if(!num())return log('Add contact number first');sendSms()};
+$('relo').onclick=()=>{navigator.geolocation.getCurrentPosition(p=>{pos=p.coords;log('Location refreshed');sendSms()},()=>{log('Could not refresh location');sendSms()},{enableHighAccuracy:true,timeout:5000})};
 $('shr').onclick=()=>{if(navigator.share)navigator.share({title:'Women Shield alert',text:msg()}).catch(()=>{});else if(navigator.clipboard)navigator.clipboard.writeText(msg()).then(()=>log('Message copied'))};
 $('start').onclick=()=>{$('home').style.display='none';$('app').style.display='block';window.scrollTo(0,0)};
 $('bk').onclick=()=>{$('app').style.display='none';$('home').style.display='block'};
