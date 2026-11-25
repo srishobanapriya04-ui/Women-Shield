@@ -43,6 +43,7 @@ a.back{color:var(--mut);font-size:.8rem;cursor:pointer;text-decoration:underline
 
 <div class="card"><div class="st" id="stat"><span class="dot"></span><span id="stx">Not monitoring</span></div>
 <div class="small" id="loc">Location: –</div>
+<div class="small">🎤 Say “I need help” anytime to trigger SOS.</div>
 <button id="go" class="g">Start protection</button></div>
 
 <div class="card" id="chk"><div id="msg">Are you okay?</div><div id="t">20</div>
@@ -80,16 +81,16 @@ function listen(){try{const R=window.SpeechRecognition||window.webkitSpeechRecog
 rec.onresult=e=>{const w=e.results[e.results.length-1][0].transcript.toLowerCase();log('Heard: '+w);if(/\b(help|no|not ok|danger)\b/.test(w))needHelp();else if(/\b(yes|okay|ok|fine|safe)\b/.test(w))safe()};
 rec.onend=()=>{if(mode==='check'||mode==='contact')try{rec.start()}catch(e){}};rec.start()}catch(e){}}
 function stopListen(){try{rec&&(rec.onend=null,rec.stop())}catch(e){}}
-function startCheck(why){if(mode==='check'||mode==='contact'||mode==='off')return;mode='check';stage=1;log('Anomaly: '+why);
+function startCheck(why){if(mode==='on')stopSOS();if(mode==='check'||mode==='contact'||mode==='off')return;mode='check';stage=1;log('Anomaly: '+why);
 $('chk').classList.add('show');setStat('alert','Safety check in progress');
 $('msg').textContent='Are you okay?';left=+$('rt').value||20;$('t').textContent=left;
 beep(true);speak('Are you okay? Please respond.');voiceTimer=setInterval(()=>speak('Are you okay? Say yes or tap I am okay.'),8000);listen();
 tick=setInterval(()=>{left--;$('t').textContent=left;if(left<=0)escalate()},1000)}
 function clearAll(){clearInterval(tick);clearInterval(voiceTimer);beep(false);stopListen();try{speechSynthesis.cancel()}catch(e){}}
-function safe(){clearAll();$('share').style.display='none';$('chk').classList.remove('show');mode='on';stage=0;lastMove=Date.now();setStat('on','Protection active');log('User confirmed safe');speak('Glad you are safe.')}
+function safe(){window.vsos=false;clearAll();setTimeout(startSOS,800);$('share').style.display='none';$('chk').classList.remove('show');mode='on';stage=0;lastMove=Date.now();setStat('on','Protection active');log('User confirmed safe');speak('Glad you are safe.')}
 function needHelp(){log('User asked for help');escalate(true)}
 function num(){let d=($('cp').value||'').replace(/\D/g,'');if(d.length===10)d='91'+d;return d}
-function msg(){const n=$('cn').value;return '🆘 Women Shield alert: I may be in danger and did not respond to a safety check. My current location: '+mapLink()+' (sent '+new Date().toLocaleTimeString()+')'}
+function msg(){const n=$('cn').value;return '🆘 Women Shield alert: '+(window.vsos?'I said "I need help" (voice SOS).':'I may be in danger and did not respond to a safety check.')+' My current location: '+mapLink()+' (sent '+new Date().toLocaleTimeString()+')'}
 function smsUrl(){return 'sms:+'+num()+'?&body='+encodeURIComponent(msg())}
 function sendAlert(){$('share').style.display='block';
 if(!num()){log('No contact number saved - use Share below');return}
@@ -100,6 +101,16 @@ $('relo').onclick=()=>{navigator.geolocation.getCurrentPosition(p=>{pos=p.coords
 $('shr').onclick=()=>{if(navigator.share)navigator.share({title:'Women Shield alert',text:msg()}).catch(()=>{});else if(navigator.clipboard)navigator.clipboard.writeText(msg()).then(()=>log('Message copied'))};
 $('start').onclick=()=>{$('home').style.display='none';$('app').style.display='block';window.scrollTo(0,0)};
 $('bk').onclick=()=>{$('app').style.display='none';$('home').style.display='block'};
+let sos=null;
+function startSOS(){try{if(sos||mode==='off')return;const R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R){log('Voice trigger not supported in this browser');return}
+sos=new R();sos.continuous=true;sos.interimResults=false;sos.lang='en-IN';
+sos.onresult=e=>{const w=e.results[e.results.length-1][0].transcript.toLowerCase();if(/i need help|need help|help me|save me/.test(w))voiceSOS(w)};
+sos.onend=()=>{if(sos&&mode==='on')try{sos.start()}catch(x){}};sos.onerror=()=>{};
+sos.start();log('Voice trigger on: say "I need help"')}catch(e){}}
+function stopSOS(){try{if(sos){const r=sos;sos=null;r.onend=null;r.stop()}}catch(e){}}
+function voiceSOS(w){if(mode!=='on')return;stopSOS();log('Voice SOS heard: '+w);window.vsos=true;mode='check';stage=1;
+$('chk').classList.add('show');setStat('alert','Voice SOS triggered');beep(true);
+speak('Help request heard. Alerting your emergency contact with your location, then the helpline.');listen();escalate()}
 function escalate(){clearInterval(tick);clearInterval(voiceTimer);
 if(stage===1){stage=2;mode='contact';const n=$('cn').value||'your contact';log('No response – alerting '+n);
 $('msg').textContent='Alerting '+n+'. Are you okay now?';left=+$('rt').value||20;$('t').textContent=left;
@@ -120,11 +131,11 @@ last={latitude:c.latitude,longitude:c.longitude,t:p.timestamp}}
 function dist(a,b){const R=6371000,r=Math.PI/180,x=(b.latitude-a.latitude)*r,y=(b.longitude-a.longitude)*r;
 const h=Math.sin(x/2)**2+Math.cos(a.latitude*r)*Math.cos(b.latitude*r)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
 $('go').onclick=()=>{
-if(mode!=='off'){clearAll();if(wid!==null)navigator.geolocation.clearWatch(wid);clearInterval(window.mon);mode='off';$('share').style.display='none';$('chk').classList.remove('show');setStat('','Not monitoring');$('go').textContent='Start protection';$('go').className='g';log('Protection stopped');return}
+if(mode!=='off'){clearAll();if(wid!==null)navigator.geolocation.clearWatch(wid);clearInterval(window.mon);mode='off';stopSOS();$('share').style.display='none';$('chk').classList.remove('show');setStat('','Not monitoring');$('go').textContent='Start protection';$('go').className='g';log('Protection stopped');return}
 try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();speechSynthesis.speak(new SpeechSynthesisUtterance(''))}catch(e){}
 if(!navigator.geolocation){log('Location not supported');return}
 wid=navigator.geolocation.watchPosition(onPos,e=>log('Location error: '+e.message),{enableHighAccuracy:true,maximumAge:5000});
-mode='on';lastMove=Date.now();setStat('on','Protection active');$('go').textContent='Stop protection';$('go').className='r';log('Protection started');
+mode='on';lastMove=Date.now();setStat('on','Protection active');$('go').textContent='Stop protection';$('go').className='r';log('Protection started');startSOS();
 window.mon=setInterval(()=>{if(mode==='on'&&(Date.now()-lastMove)/1000>(+$('idle').value||120))startCheck('no movement for '+$('idle').value+'s')},3000)};
 load();
 </script></body></html>
