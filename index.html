@@ -100,7 +100,7 @@ log('Laptop: message copied - paste it in Google Messages, or use the WhatsApp b
 function sendAlert(){$('share').style.display='block';
 if(!num()){log('No contact number saved - use Share below');return}
 log('Alert prepared for contact with live location');sendSms(true)}
-$('wa').onclick=()=>{if(!num())return log('Add contact number first');window.open('https://wa.me/'+num()+'?text='+encodeURIComponent(msg()),'_blank');log('Opened WhatsApp with location')};
+$('wa').onclick=()=>{if(!num())return log('Add contact number first');window.open((isMobile?'https://wa.me/':'https://web.whatsapp.com/send?phone=')+num()+(isMobile?'?text=':'&text=')+encodeURIComponent(msg()),'_blank');log('Opened WhatsApp with location')};
 $('sm').onclick=()=>{if(!num())return log('Add contact number first');sendSms()};
 $('relo').onclick=()=>{navigator.geolocation.getCurrentPosition(p=>{pos=p.coords;log('Location refreshed');sendSms()},()=>{log('Could not refresh location');sendSms()},{enableHighAccuracy:true,timeout:5000})};
 $('shr').onclick=()=>{if(navigator.share)navigator.share({title:'Women Shield alert',text:msg()}).catch(()=>{});else if(navigator.clipboard)navigator.clipboard.writeText(msg()).then(()=>log('Message copied'))};
@@ -144,3 +144,5 @@ mode='on';lastMove=Date.now();setStat('on','Protection active');$('go').textCont
 window.mon=setInterval(()=>{if(mode==='on'&&(Date.now()-lastMove)/1000>(+$('idle').value||120))startCheck('no movement for '+$('idle').value+'s')},3000)};
 load();
 </script></body></html>
+
+
